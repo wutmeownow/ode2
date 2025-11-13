@@ -42,6 +42,27 @@ double sol246(double* xPtr, double par[]){
   return x*TMath::Power(TMath::Log(x),2) + 5*x;
 }
 
+// function to make error graphs from chatgpt
+TGraph makeErrorGraph(const TGraph& g_method, const TF1& f_exact) {
+    int n = g_method.GetN();
+    // cout<<n<<endl;
+    TGraph g_error;
+    g_error.SetTitle("Percent Error; x;");
+
+    for (int i = 0; i < n; ++i) {
+        double x, y;
+        g_method.GetPoint(i, x, y);
+        double y_exact = f_exact.Eval(x);
+        double err = 0;
+        if (std::abs(y_exact) > 1e-12){
+          err = std::abs(y - y_exact)/std::abs(y);
+        } 
+        g_error.SetPoint(i, x, err);
+    }
+
+    return g_error;
+}
+
 int main(int argc, char **argv){
   TApplication theApp("App", &argc, argv); // init ROOT App for displays
 
@@ -55,12 +76,15 @@ int main(int argc, char **argv){
   //TF1 fun_sol=TF1("fun_sol","-2*log(x)/x+2/x",1,100);   // exact solution
 
   // my odes and solutions
-  // TGraph tg1=RK1Solve(prob245,0,30,0,3);                     // initial condition y(0)=0
-  // TGraph tg2=RK2Solve(prob245,0,30,0,3);
-  // TF1 fun_sol=TF1("fun_sol",sol245,0,3);           // exact solution
-  TGraph tg1=RK1Solve(prob246,5,30,1,4);                     // initial condition y(1)=5
-  TGraph tg2=RK2Solve(prob246,5,30,1,4);
-  TF1 fun_sol=TF1("fun_sol",sol246,1,4);           // exact solution
+  const double xmax = 10;
+  const double nsteps = xmax*10;
+  TGraph tg1=RK1Solve(prob245,0,nsteps,0,xmax);                     // initial condition y(0)=0
+  TGraph tg2=RK2Solve(prob245,0,nsteps,0,xmax);
+  TGraph tg4=RK4Solve(prob245,0,nsteps,0,xmax);
+  TF1 fun_sol=TF1("fun_sol",sol245,0,xmax);           // exact solution
+  // TGraph tg1=RK1Solve(prob246,5,30,1,4);                     // initial condition y(1)=5
+  // TGraph tg2=RK2Solve(prob246,5,30,1,4);
+  // TF1 fun_sol=TF1("fun_sol",sol246,1,4);           // exact solution
 
   // ******************************************************************************
   // ** this block is useful for supporting both high and std resolution screens **
@@ -69,14 +93,35 @@ int main(int argc, char **argv){
   // UInt_t dw = 1.1*dh;
   // ******************************************************************************
 
-  TCanvas *c1 = new TCanvas("c1","DEQ solutions",800,800);
+  // percent error graphs
+  TGraph g_err1 = makeErrorGraph(tg1, fun_sol);
+  TGraph g_err2 = makeErrorGraph(tg2, fun_sol);
+  TGraph g_err4 = makeErrorGraph(tg4, fun_sol);
+
+  // std::cout << "Error graph points: " << g_err1.GetN() << ", "<< g_err2.GetN() << ", " << g_err4.GetN() << std::endl;
+
+
+  // Style and draw
+  g_err1.SetLineColor(kRed);
+  g_err2.SetLineColor(kBlue);
+  g_err4.SetLineColor(kGreen+2);
+  g_err1.SetLineWidth(2);
+  g_err2.SetLineWidth(2);
+  g_err4.SetLineWidth(2);
+
+
+  TCanvas *c1 = new TCanvas("c1","DEQ solutions",1600,800);
+  c1->Divide(2,1);
+  c1->cd(1);
 
   // tg1.SetMarkerSize(0.015*dh/8);  // size scale: 1 = 8 pixels, so here we choose the size to be 1.5% of the window height
   // tg2.SetMarkerSize(0.015*dh/8);
   tg1.SetMarkerStyle(kFullTriangleUp);
   tg2.SetMarkerStyle(kFullTriangleDown);
+  tg4.SetMarkerStyle(kFullDotMedium);
   tg1.SetMarkerColor(kRed);
   tg2.SetMarkerColor(kGreen-2);
+  tg4.SetMarkerColor(kBlue);
   fun_sol.SetLineColor(kBlack);
   fun_sol.SetLineStyle(2);
   
@@ -84,26 +129,44 @@ int main(int argc, char **argv){
   tg1.SetTitle("ODE demo;x;y");
   tg1.Draw("AP");
   tg2.Draw("P");
+  tg4.Draw("P");
   fun_sol.Draw("same");
   
   TLegend *tl = new TLegend(0.6,0.7,0.9,0.9);
   tl->AddEntry(&tg1,"RK1 Solution","p");
   tl->AddEntry(&tg2,"RK2 Solution","p");
+  tl->AddEntry(&tg4,"RK4 Solution","p");
   tl->AddEntry(&fun_sol,"Exact Solution","l");
   tl->Draw();
+
+  // errors
+  c1->cd(2);
+  gPad->SetLogy();
+  g_err1.Draw("AL");
+  g_err2.Draw("L SAME");
+  g_err4.Draw("L SAME");
+
+  TLegend* leg = new TLegend(0.55, 0.75, 0.88, 0.88);
+  leg->AddEntry(&g_err1, "RK1 (Euler)", "l");
+  leg->AddEntry(&g_err2, "RK2", "l");
+  leg->AddEntry(&g_err4, "RK4", "l");
+  leg->Draw();
+
+
   c1->Draw();
   c1->Update();
   c1->Print("OED_cpp.png");
 
   // retreive the data from the graphs and write to a file
   FILE *fp=fopen("RKdemo.dat","w");
-  double *x, *y1, *y2;
+  double *x, *y1, *y2, *y4;
   x=tg1.GetX();
   y1=tg1.GetY();
   y2=tg2.GetY();
-  fprintf(fp,"#%8s %9s %9s %9s\n","x","RK1","RK2","Exact");
+  y4=tg4.GetY();
+  fprintf(fp,"#%8s %9s %9s %9s %9s\n","x","RK1","RK2","RK4","Exact");
   for (int i=0; i<tg1.GetN(); i++){
-    fprintf(fp,"%9.4lf %9.4lf %9.4lf %9.4lf\n",x[i],y1[i],y2[i],fun_sol.Eval(x[i]));
+    fprintf(fp,"%9.4lf %9.4lf %9.4lf %9.4lf %9.4lf\n",x[i],y1[i],y2[i],y4[i],fun_sol.Eval(x[i]));
   }
   fclose(fp);
   
