@@ -6,6 +6,7 @@
 #include "TGClient.h"
 #include "TF1.h"
 #include "TCanvas.h"
+#include "TMath.h"
 #include <iostream>
 #include <cstdio>
 
@@ -21,29 +22,57 @@ double fun2(double x, double y){
   return -y/x-2/(x*x);  // f = y'(x,y) = -y(x)/x - 2/x^2 
 }                       // -2*log(|x|)/x+2/x  ; with initial condition y(0)=2
 
+// diff eqs from https://openstax.org/books/calculus-volume-2/pages/4-5-first-order-linear-equations
+double prob245(double x, double y){
+  return (1./(1.+TMath::Power(x,2)))*(y-1); // y'(x,y)= 1/(1+x^2) * (y-1)
+}
+
+double prob246(double x, double y){
+  return (1./x)*(y+2.*x*TMath::Log(x)); // y'(x,y) = (1/x)*(y + 2xlnx)
+}
+
+
+double sol245(double* xPtr, double par[]){        
+  double x = *xPtr; 
+  return 1.-TMath::Exp(TMath::ATan(x));
+}
+
+double sol246(double* xPtr, double par[]){        
+  double x = *xPtr; 
+  return x*TMath::Power(TMath::Log(x),2) + 5*x;
+}
+
 int main(int argc, char **argv){
   TApplication theApp("App", &argc, argv); // init ROOT App for displays
 
   // solve our DEQ using RK1 or RK2 methods!
   // Two examples are given.  Choose a function for testing
-  TGraph tg1=RK1Solve(fun1,3,30,0,3);                     // initial condition y(0)=3
-  TGraph tg2=RK2Solve(fun1,3,30,0,3);
-  TF1 fun_sol=TF1("fun_sol","3*exp(-2*x)",0,3);           // exact solution
+  // TGraph tg1=RK1Solve(fun1,3,30,0,3);                     // initial condition y(0)=3
+  // TGraph tg2=RK2Solve(fun1,3,30,0,3);
+  // TF1 fun_sol=TF1("fun_sol","3*exp(-2*x)",0,3);           // exact solution
   //TGraph tg1=RK1Solve(fun2,2,100,1,100);                // initial condition y(1)=2
   //TGraph tg2=RK2Solve(fun2,2,100,1,100);
   //TF1 fun_sol=TF1("fun_sol","-2*log(x)/x+2/x",1,100);   // exact solution
 
+  // my odes and solutions
+  // TGraph tg1=RK1Solve(prob245,0,30,0,3);                     // initial condition y(0)=0
+  // TGraph tg2=RK2Solve(prob245,0,30,0,3);
+  // TF1 fun_sol=TF1("fun_sol",sol245,0,3);           // exact solution
+  TGraph tg1=RK1Solve(prob246,5,30,1,4);                     // initial condition y(1)=5
+  TGraph tg2=RK2Solve(prob246,5,30,1,4);
+  TF1 fun_sol=TF1("fun_sol",sol246,1,4);           // exact solution
+
   // ******************************************************************************
   // ** this block is useful for supporting both high and std resolution screens **
-  UInt_t dh = gClient->GetDisplayHeight()/2;   // fix plot to 1/2 screen height  
+  // UInt_t dh = gClient->GetDisplayHeight()/2;   // fix plot to 1/2 screen height  
   //UInt_t dw = gClient->GetDisplayWidth();
-  UInt_t dw = 1.1*dh;
+  // UInt_t dw = 1.1*dh;
   // ******************************************************************************
 
-  TCanvas *c1 = new TCanvas("c1","DEQ solutions",dw,dh);
+  TCanvas *c1 = new TCanvas("c1","DEQ solutions",800,800);
 
-  tg1.SetMarkerSize(0.015*dh/8);  // size scale: 1 = 8 pixels, so here we choose the size to be 1.5% of the window height
-  tg2.SetMarkerSize(0.015*dh/8);
+  // tg1.SetMarkerSize(0.015*dh/8);  // size scale: 1 = 8 pixels, so here we choose the size to be 1.5% of the window height
+  // tg2.SetMarkerSize(0.015*dh/8);
   tg1.SetMarkerStyle(kFullTriangleUp);
   tg2.SetMarkerStyle(kFullTriangleDown);
   tg1.SetMarkerColor(kRed);
