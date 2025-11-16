@@ -9,8 +9,11 @@
 #include "TMath.h"
 #include <iostream>
 #include <cstdio>
+#include <limits>
+#include <cmath>
 
 using namespace std;
+const double minDouble = std::numeric_limits<double>::min();
 
 // differential equation to be solved
 double fun1(double x, double y){
@@ -53,10 +56,15 @@ TGraph makeErrorGraph(const TGraph& g_method, const TF1& f_exact) {
         double x, y;
         g_method.GetPoint(i, x, y);
         double y_exact = f_exact.Eval(x);
-        double err = 0;
-        if (std::abs(y_exact) > 1e-12){
-          err = std::abs(y - y_exact)/std::abs(y);
-        } 
+        double err = std::abs(y - y_exact)/std::abs(y);
+        if (isnan(err) || std::abs(y_exact)<1e-12) {
+          std::cout<<y_exact<<std::endl;
+          std::cout<<"y exact too small"<<std::endl;
+          err = 0;
+        }
+        // if (std::abs(y_exact) > 1e-12){
+        //   err = std::abs(y - y_exact)/std::abs(y);
+        // } 
         g_error.SetPoint(i, x, err);
     }
 
@@ -76,12 +84,15 @@ int main(int argc, char **argv){
   //TF1 fun_sol=TF1("fun_sol","-2*log(x)/x+2/x",1,100);   // exact solution
 
   // my odes and solutions
-  const double xmax = 10;
-  const double nsteps = xmax*10;
-  TGraph tg1=RK1Solve(prob245,0,nsteps,0,xmax);                     // initial condition y(0)=0
-  TGraph tg2=RK2Solve(prob245,0,nsteps,0,xmax);
-  TGraph tg4=RK4Solve(prob245,0,nsteps,0,xmax);
-  TF1 fun_sol=TF1("fun_sol",sol245,0,xmax);           // exact solution
+  // std::cout << "Minimum value for double: " << std::numeric_limits<double>::min() << endl;
+  const double xmax = 2.;
+  const double xmin = -2.;
+  const double nsteps = (xmax-xmin)*10;
+  TF1 fun_sol=TF1("fun_sol",sol245,xmin,xmax);  // exact solution
+  const double y0 = fun_sol.Eval(xmin);   // initial condition y(0)=0
+  TGraph tg1=RK1Solve(prob245,y0,nsteps,xmin,xmax);                     
+  TGraph tg2=RK2Solve(prob245,y0,nsteps,xmin,xmax);
+  TGraph tg4=RK4Solve(prob245,y0,nsteps,xmin,xmax);
   // TGraph tg1=RK1Solve(prob246,5,30,1,4);                     // initial condition y(1)=5
   // TGraph tg2=RK2Solve(prob246,5,30,1,4);
   // TF1 fun_sol=TF1("fun_sol",sol246,1,4);           // exact solution
@@ -155,7 +166,7 @@ int main(int argc, char **argv){
 
   c1->Draw();
   c1->Update();
-  c1->Print("OED_cpp.png");
+  c1->Print("RK4.pdf");
 
   // retreive the data from the graphs and write to a file
   FILE *fp=fopen("RKdemo.dat","w");
